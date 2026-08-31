@@ -20,7 +20,7 @@ StackBridge permet l’**import massif de documents vers BookStack** : DOCX/Word
 - 🖼️ Image extraction and integration into BookStack pages
 - 🤖 Optional AI-assisted document enhancement
 - 🔌 OpenAI-compatible AI endpoints and Ollama preset
-- 🐳 Docker / Docker Compose deployment
+- 🐳 Ready-to-use Docker Hub image and Docker Compose deployment
 - 🔐 Encrypted BookStack and AI API credentials
 - 🛡️ HTML sanitization, CSRF protection and secure admin sessions
 - 🏠 Fully **self-hosted**
@@ -40,6 +40,14 @@ Typical use cases include:
 
 ## 🚀 Quick start with Docker
 
+The official StackBridge image is published as:
+
+```text
+odi2050/stackbridge:latest
+```
+
+A local Docker build is therefore **not required** for a normal installation.
+
 ### Requirements
 
 - Docker Engine or Docker Desktop with Compose v2;
@@ -49,10 +57,17 @@ Typical use cases include:
 
 ### Installation
 
+Clone the repository to obtain `docker-compose.yml`, `.env.example` and the setup scripts:
+
 ```bash
 git clone https://github.com/odi2050/stackbridge.git
 cd stackbridge
-docker build --build-arg APP_VERSION=1.0.0 -t stackbridge:1.0.0 .
+```
+
+Pull the published image from Docker Hub:
+
+```bash
+docker compose pull
 ```
 
 Generate the `.env` file interactively. The setup command asks for the administrator password and automatically creates its scrypt hash as well as session and encryption keys.
@@ -60,27 +75,42 @@ Generate the `.env` file interactively. The setup command asks for the administr
 Linux / macOS:
 
 ```bash
-docker run --rm -it -v "$PWD:/config" stackbridge:1.0.0 \
+docker run --rm -it -v "$PWD:/config" odi2050/stackbridge:latest \
   python /app/scripts/setup_env.py --output /config/.env
 ```
 
 PowerShell:
 
 ```powershell
-docker run --rm -it -v "${PWD}:/config" stackbridge:1.0.0 `
+docker run --rm -it -v "${PWD}:/config" odi2050/stackbridge:latest `
   python /app/scripts/setup_env.py --output /config/.env
 ```
 
 Start StackBridge:
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 docker compose ps
 ```
 
 Open `http://SERVER_ADDRESS:5050`. Administration is available at `/admin`.
 
 The container uses Waitress with eight threads. Encrypted settings are persisted in `data/`, logs in `logs/`, and the healthcheck queries `/api/health` every 30 seconds.
+
+### Use a specific StackBridge version
+
+By default, Compose uses `odi2050/stackbridge:latest`. To pin the deployment to a specific published version, set for example:
+
+```env
+APP_VERSION=1.0.0
+```
+
+Then run:
+
+```bash
+docker compose pull
+docker compose up -d
+```
 
 ## 📂 Importing folders
 
@@ -90,12 +120,15 @@ The internal ZIP paths are used to create the corresponding **BookStack chapter 
 
 ## 🔄 Docker update
 
+To update a deployment using the Docker Hub image:
+
 ```bash
 git pull
-python scripts/check_release.py
-docker compose build --pull
+docker compose pull
 docker compose up -d
 ```
+
+If `APP_VERSION` is not defined, Compose pulls `odi2050/stackbridge:latest`. If `APP_VERSION` is defined, it pulls the corresponding version tag.
 
 Before a major update, back up `.env`, `data/` and `logs/`. Never delete `data/.settings.key` if `SETTINGS_ENCRYPTION_KEY` is not defined in `.env`.
 
@@ -113,6 +146,13 @@ Remove only the container while keeping persistent data:
 docker compose down
 ```
 
+Recreate it later with:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
 ## 🏷️ Versioning and Docker releases
 
 StackBridge follows [Semantic Versioning](https://semver.org/) using `MAJOR.MINOR.PATCH`.
@@ -121,28 +161,26 @@ StackBridge follows [Semantic Versioning](https://semver.org/) using `MAJOR.MINO
 - `MINOR`: backward-compatible feature;
 - `PATCH`: backward-compatible fix.
 
-The `VERSION` file is the repository source of truth. The same value must be set in `APP_VERSION` in `.env` when creating a release. It is then:
+The `VERSION` file is the repository source of truth for development releases. Published Docker images should use matching version tags such as:
 
-- embedded in the image as `STACKBRIDGE_VERSION`;
-- used for the `stackbridge:<version>` tag;
-- written to OCI image labels;
-- displayed in the interface;
-- exposed through `/api/version` and `/api/health`;
-- used for CSS and JavaScript cache invalidation.
+```text
+odi2050/stackbridge:1.0.0
+odi2050/stackbridge:latest
+```
 
-### Create a release
+Never reuse the same version tag for different releases. For intermediate testing, use SemVer prereleases such as `1.1.0-rc.1`.
 
-1. Choose the new SemVer version, for example `1.1.0`.
-2. Update `VERSION` and `APP_VERSION` in `.env` with the same value.
-3. Add changes to `CHANGELOG.md` under a dated section.
-4. Validate consistency: `python scripts/check_release.py`.
-5. Build: `docker compose build --pull`.
-6. Verify: `docker compose run --rm stackbridge python -c "from version import APP_VERSION; print(APP_VERSION)"`.
-7. Start: `docker compose up -d`.
-8. Check: `docker compose ps`, then open `/api/health`.
-9. Optionally create a Git tag: `git tag -a v1.1.0 -m "StackBridge 1.1.0"`.
+### Build the image locally (developers)
 
-Never reuse the same tag for different images. For intermediate testing, use SemVer prereleases such as `1.1.0-rc.1`.
+A local build remains possible for development or testing:
+
+```bash
+git clone https://github.com/odi2050/stackbridge.git
+cd stackbridge
+docker build --build-arg APP_VERSION=1.0.0 -t stackbridge:1.0.0 .
+```
+
+The Dockerfile embeds `APP_VERSION` as `STACKBRIDGE_VERSION`, adds OCI image metadata, exposes port `5050` and includes the application healthcheck.
 
 ## 🐍 Installation without Docker
 
@@ -282,7 +320,7 @@ Sensitive `settings.json` fields (`token_id`, `token_secret`, `ai_api_key`) are 
 4. Back up `data/settings.json`, `data/admin_auth.json` and the encryption key separately.
 5. Restrict `data/` and `logs/` permissions to the application account.
 6. Keep TLS verification enabled and rotate BookStack tokens and AI keys regularly.
-7. Never publish `.env`, `data/`, `logs/` or a Docker image built without the appropriate `.dockerignore` protections.
+7. Never publish `.env`, `data/` or `logs/`.
 
 ## 🔍 Search keywords
 
