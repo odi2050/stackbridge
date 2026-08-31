@@ -1,0 +1,9 @@
+.venv/
+.env
+__pycache__/
+*.pyc
+data/settings.json
+data/admin_auth.json
+data/.settings.key
+*.log
+logs/
