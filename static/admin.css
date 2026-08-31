@@ -1,0 +1,7 @@
+.narrow{max-width:520px;margin-top:10vh}
+.button-link{display:inline-block;border-radius:7px;background:#455a64;color:#fff;padding:9px 13px;font-weight:650;text-decoration:none;margin-left:8px}
+.button-link.muted{background:#71808a}
+.back{display:block;margin-top:18px;color:#206ea7}
+.error{background:#fde8e8;color:#a11;padding:10px;border-radius:7px;margin:12px 0}
+#result{margin-top:12px;font-weight:650}
+.configuration-state{padding:10px 12px;border-radius:7px;background:#fff4d6;color:#725500}.configuration-state.ready{background:#e5f6e9;color:#236b35}
