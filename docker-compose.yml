@@ -1,18 +1,15 @@
 services:
   stackbridge:
-    image: "stackbridge:${APP_VERSION:?Définissez APP_VERSION dans le fichier .env}"
-    build:
-      context: .
-      args:
-        APP_VERSION: "${APP_VERSION:?Définissez APP_VERSION dans le fichier .env}"
+    image: "odi2050/stackbridge:${APP_VERSION:-latest}"
     container_name: stackbridge
-    ports: ["5050:5050"]
+    ports:
+      - "5050:5050"
     environment:
       OCR_LANG: "fra+eng"
       MAX_UPLOAD_MB: "500"
       DEBUG_LOGS: "false"
       AI_MAX_INPUT_TOKENS: "6000"
-      STACKBRIDGE_VERSION: "${APP_VERSION:?Définissez APP_VERSION dans le fichier .env}"
+      STACKBRIDGE_VERSION: "${APP_VERSION:-latest}"
       ADMIN_PASSWORD_HASH: "${ADMIN_PASSWORD_HASH:?Définissez ADMIN_PASSWORD_HASH dans le fichier .env}"
       SECRET_KEY: "${SECRET_KEY:?Définissez SECRET_KEY dans le fichier .env}"
       SETTINGS_ENCRYPTION_KEY: "${SETTINGS_ENCRYPTION_KEY:-}"
