@@ -14,8 +14,9 @@ password=getpass.getpass("Nouveau mot de passe administrateur (12 caractères mi
 confirmation=getpass.getpass("Confirmez le mot de passe : ")
 if password!=confirmation:raise SystemExit("Les mots de passe ne correspondent pas.")
 if len(password)<12:raise SystemExit("Le mot de passe doit contenir au moins 12 caractères.")
-version=(Path(__file__).resolve().parent.parent/"VERSION").read_text(encoding="utf-8").strip()
-content=f"""APP_VERSION={version}
+content=f"""# Laissez APP_VERSION sur latest pour toujours utiliser l'image Docker la plus récente.
+# Remplacez uniquement par une version précise si vous souhaitez volontairement figer StackBridge.
+APP_VERSION=latest
 ADMIN_PASSWORD_HASH='{generate_password_hash(password,method='scrypt')}'
 SECRET_KEY={secrets.token_hex(32)}
 SETTINGS_ENCRYPTION_KEY={Fernet.generate_key().decode()}
