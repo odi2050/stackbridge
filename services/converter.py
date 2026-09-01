@@ -20,13 +20,24 @@ def pdf(p,lang):
   native=page.get_text("text").strip();out.append(f"<section><h2>Page {no}</h2>")
   detail("Converter PDF page=%s native_chars=%s",no,len(native))
   if len(native)<40:
-   pix=page.get_pixmap(matrix=pymupdf.Matrix(2,2),alpha=False);raw=pix.tobytes("png");txt,err=image_to_text(raw,lang)
+   # A low-text page is treated as a scan. Render it once and always preserve
+   # that rendering, whether OCR succeeds, returns no text, or fails.
+   pix=page.get_pixmap(matrix=pymupdf.Matrix(2,2),alpha=False);raw=pix.tobytes("png")
+   try:
+    txt,err=image_to_text(raw,lang)
+   except Exception as exc:
+    txt="";err=str(exc);detail("Converter PDF OCR exception page=%s error=%s",no,err)
    if txt.strip():
     ocr+=1
     for x in txt.splitlines():
      if x.strip():out.append("<p>"+html.escape(x.strip())+"</p>")
-    out.append(f'<details><summary>Scan original</summary><img src="data:image/png;base64,{base64.b64encode(raw).decode()}" style="max-width:100%"></details>');imgs+=1;out.append("</section>");continue
-   if err:warn.append(f"Page {no}: {err}")
+    out.append(f'<details><summary>Scan original</summary><img src="data:image/png;base64,{base64.b64encode(raw).decode()}" style="max-width:100%"></details>')
+   else:
+    if err:warn.append(f"Page {no}: OCR impossible - {err}")
+    else:warn.append(f"Page {no}: OCR sans texte exploitable")
+    detail("Converter PDF OCR fallback page=%s error=%s",no,err or "empty OCR result")
+    out.append(f'<p><em>OCR non exploitable - page originale conservée.</em></p><img src="data:image/png;base64,{base64.b64encode(raw).decode()}" style="max-width:100%">')
+   imgs+=1;out.append("</section>");continue
   blocks=sorted(page.get_text("dict").get("blocks",[]),key=lambda b:(b.get("bbox",[0,0])[1],b.get("bbox",[0,0])[0]))
   for b in blocks:
    if b.get("type")==0:
