@@ -7,9 +7,9 @@ from cryptography.fernet import Fernet,InvalidToken
 DATA_DIR=Path(__file__).resolve().parent.parent/"data"
 SETTINGS_FILE=DATA_DIR/"settings.json"
 KEY_FILE=DATA_DIR/".settings.key"
-SECRET_FIELDS={"token_id","token_secret","ai_api_key"}
+SECRET_FIELDS={"token_id","token_secret","ai_api_key","oidc_client_secret"}
 PREFIX="enc:v1:"
-DEFAULTS={"bookstack_url":"","token_id":"","token_secret":"","ai_url":"","ai_model":"","ai_api_key":"","ai_custom_enabled":False,"ai_endpoint":"/chat/completions","ai_request_json":"","ai_response_path":"choices.0.message.content","verify_tls":True,"debug_logs":False,"send_images_to_ai":False}
+DEFAULTS={"bookstack_url":"","token_id":"","token_secret":"","ai_url":"","ai_model":"","ai_api_key":"","ai_custom_enabled":False,"ai_endpoint":"/chat/completions","ai_request_json":"","ai_response_path":"choices.0.message.content","verify_tls":True,"debug_logs":False,"send_images_to_ai":False,"oidc_enabled":False,"oidc_issuer":"","oidc_client_id":"","oidc_client_secret":"","oidc_scopes":"openid profile email","oidc_display_name":"SSO","oidc_local_fallback":True}
 
 def _fernet():
  key=os.getenv("SETTINGS_ENCRYPTION_KEY","").strip().encode()
@@ -62,14 +62,14 @@ def save(values):
  current=load()
  for key in DEFAULTS:
   value=values.get(key)
-  if key in ("token_secret","ai_api_key") and not value:continue
-  if key in ("verify_tls","debug_logs","send_images_to_ai","ai_custom_enabled"):current[key]=value is True or str(value).lower()=="true"
+  if key in ("token_secret","ai_api_key","oidc_client_secret") and not value:continue
+  if key in ("verify_tls","debug_logs","send_images_to_ai","ai_custom_enabled","oidc_enabled","oidc_local_fallback"):current[key]=value is True or str(value).lower()=="true"
   else:current[key]=str(value or "").strip()
  _write(current);return current
 
 def public():
  data=load()
- return {"bookstack_url":data["bookstack_url"],"token_id":data["token_id"],"has_token_secret":bool(data["token_secret"]),"ai_url":data["ai_url"],"ai_model":data["ai_model"],"has_ai_api_key":bool(data["ai_api_key"]),"ai_custom_enabled":bool(data["ai_custom_enabled"]),"ai_endpoint":data["ai_endpoint"],"ai_request_json":data["ai_request_json"],"ai_response_path":data["ai_response_path"],"verify_tls":bool(data["verify_tls"]),"debug_logs":bool(data["debug_logs"]),"send_images_to_ai":bool(data["send_images_to_ai"])}
+ return {"bookstack_url":data["bookstack_url"],"token_id":data["token_id"],"has_token_secret":bool(data["token_secret"]),"ai_url":data["ai_url"],"ai_model":data["ai_model"],"has_ai_api_key":bool(data["ai_api_key"]),"ai_custom_enabled":bool(data["ai_custom_enabled"]),"ai_endpoint":data["ai_endpoint"],"ai_request_json":data["ai_request_json"],"ai_response_path":data["ai_response_path"],"verify_tls":bool(data["verify_tls"]),"debug_logs":bool(data["debug_logs"]),"send_images_to_ai":bool(data["send_images_to_ai"]),"oidc_enabled":bool(data["oidc_enabled"]),"oidc_issuer":data["oidc_issuer"],"oidc_client_id":data["oidc_client_id"],"has_oidc_client_secret":bool(data["oidc_client_secret"]),"oidc_scopes":data["oidc_scopes"],"oidc_display_name":data["oidc_display_name"],"oidc_local_fallback":bool(data["oidc_local_fallback"])}
 
 def resolve(data):
  saved=load();out=dict(data or {});personal=out.get("use_personal_token") is True or str(out.get("use_personal_token","")).lower()=="true";out["url"]=saved["bookstack_url"]
