@@ -1,126 +1,167 @@
 # StackBridge — BookStack Document Importer
 
-**Open-source, self-hosted document importer for BookStack. Import DOCX / Word, PDF, Markdown, HTML and TXT into BookStack with OCR, document preview, folder-to-chapter structure and optional AI enhancement.**
+**StackBridge est un importateur de documents open-source et auto-hébergé pour BookStack. Il convertit et importe DOCX/Word, PDF, Markdown, HTML et TXT avec OCR, prévisualisation, structure dossiers → chapitres et amélioration IA optionnelle.**
 
-> **BookStack Document Importer · DOCX to BookStack · Word to BookStack · PDF to BookStack · BookStack OCR · Docker · Self-hosted**
+## Fonctionnalités
 
-StackBridge is a **Document Import Studio for BookStack**, version `1.0.0`. It is designed for users and administrators who need an easy way to migrate or bulk-import existing documentation into BookStack while preserving useful document structure.
+- import DOCX / Microsoft Word vers BookStack ;
+- moteur PDF V2 avec extraction native PyMuPDF et OCR Tesseract pour les scans ;
+- conservation de la page originale en cas d'échec OCR ;
+- Markdown, HTML et TXT ;
+- import multiple et glisser-déposer avec confirmation visuelle des fichiers chargés ;
+- ZIP avec conversion de l'arborescence en chapitres BookStack ;
+- prévisualisation avant publication ;
+- amélioration IA facultative, individuelle ou séquentielle pour tous les documents ;
+- découpage IA tenant compte des titres, listes, tableaux et blocs de code ;
+- choix global entre version originale et version IA ;
+- API OpenAI-compatible, configuration personnalisée et preset Ollama ;
+- token BookStack administrateur par défaut ;
+- token API BookStack personnel facultatif pour la traçabilité des imports ;
+- authentification OIDC/Keycloak facultative avec Authorization Code + PKCE S256 ;
+- configuration OIDC directement dans le panneau Administration ;
+- fallback local facultatif si le fournisseur OIDC est indisponible ;
+- chiffrement Fernet des secrets administrateur ;
+- Docker/Compose et fonctionnement adapté aux réseaux isolés.
 
-StackBridge permet l’**import massif de documents vers BookStack** : DOCX/Word, PDF, Markdown, HTML et TXT, avec structure dossiers → chapitres, OCR Tesseract, prévisualisation et amélioration IA optionnelle.
+Le guide détaillé des fonctions et de leur configuration se trouve dans [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
 
-## ✨ Features / Fonctionnalités
+## Installation Docker — recommandée
 
-- 📄 **DOCX / Microsoft Word to BookStack** import
-- 📕 **PDF to BookStack** import
-- 🔎 **OCR for scanned PDFs** using Tesseract
-- 📝 Markdown, HTML and TXT import
-- 📂 Bulk import of multiple documents
-- 🗂️ Folder / ZIP structure converted into **BookStack chapters**
-- 👁️ Document preview before import
-- 🖼️ Image extraction and integration into BookStack pages
-- 🤖 Optional AI-assisted document enhancement
-- 🔌 OpenAI-compatible AI endpoints and Ollama preset
-- 🐳 Ready-to-use Docker Hub image and Docker Compose deployment
-- 🔐 Encrypted BookStack and AI API credentials
-- 🛡️ HTML sanitization, CSRF protection and secure admin sessions
-- 🏠 Fully **self-hosted**
+### Image par défaut : `latest`
 
-## 🎯 Why StackBridge?
-
-BookStack is excellent for building structured documentation, but migrating an existing collection of Word documents, PDFs and folders can require significant manual work. StackBridge provides a web interface between your existing documents and the **BookStack API** so that documentation can be converted, previewed and imported more efficiently.
-
-Typical use cases include:
-
-- migrating **Word/DOCX documentation to BookStack**;
-- importing **PDF documentation into BookStack**;
-- processing scanned PDF files with **OCR**;
-- migrating a shared documentation folder into books and chapters;
-- bulk importing technical or internal documentation;
-- improving imported pages with an optional local or remote AI model.
-
-## 🚀 Quick start with Docker
-
-The official StackBridge image is published as:
+L'installation standard utilise toujours :
 
 ```text
 odi2050/stackbridge:latest
 ```
 
-A local Docker build is therefore **not required** for a normal installation.
+Le `docker-compose.yml` utilise `${APP_VERSION:-latest}` et le générateur de `.env` écrit désormais `APP_VERSION=latest`. Ainsi, **`latest` reste le choix mis en avant et utilisé par défaut**.
 
-### Requirements
+Une version précise ne doit être définie que si vous souhaitez volontairement figer le déploiement.
 
-- Docker Engine or Docker Desktop with Compose v2;
-- Git;
-- TCP port `5050` available;
-- a BookStack instance with API access.
+### Prérequis
 
-### Installation
+- Docker Engine ou Docker Desktop avec Compose v2 ;
+- Git pour récupérer les fichiers de déploiement ;
+- port TCP `5050` disponible ;
+- accès réseau à BookStack ;
+- accès à Keycloak uniquement si OIDC est activé ;
+- accès au service IA uniquement si l'amélioration IA est utilisée.
 
-Clone the repository to obtain `docker-compose.yml`, `.env.example` and the setup scripts:
+### Installation en ligne
 
 ```bash
 git clone https://github.com/odi2050/stackbridge.git
 cd stackbridge
+docker pull odi2050/stackbridge:latest
 ```
 
-Pull the published image from Docker Hub:
+Générez ensuite `.env`.
 
-```bash
-docker compose pull
-```
-
-Generate the `.env` file interactively. The setup command asks for the administrator password and automatically creates its scrypt hash as well as session and encryption keys.
-
-Linux / macOS:
+Linux/macOS :
 
 ```bash
 docker run --rm -it -v "$PWD:/config" odi2050/stackbridge:latest \
   python /app/scripts/setup_env.py --output /config/.env
 ```
 
-PowerShell:
+PowerShell :
 
 ```powershell
 docker run --rm -it -v "${PWD}:/config" odi2050/stackbridge:latest `
   python /app/scripts/setup_env.py --output /config/.env
 ```
 
-Start StackBridge:
+Démarrez :
 
 ```bash
 docker compose up -d
 docker compose ps
 ```
 
-Open `http://SERVER_ADDRESS:5050`. Administration is available at `/admin`.
+Ouvrez ensuite `http://ADRESSE_DU_SERVEUR:5050`. Le panneau d'administration est disponible sur `/admin`.
 
-The container uses Waitress with eight threads. Encrypted settings are persisted in `data/`, logs in `logs/`, and the healthcheck queries `/api/health` every 30 seconds.
+## Installation hors ligne / Air Gap
 
-### Use a specific StackBridge version
+L'installation Docker est la méthode la plus simple en environnement isolé : **toutes les dépendances Python, Tesseract, Pandoc et LibreOffice nécessaires au conteneur sont transportées dans l'image Docker**.
 
-By default, Compose uses `odi2050/stackbridge:latest`. To pin the deployment to a specific published version, set for example:
+### 1. Sur un PC connecté à Internet
 
-```env
-APP_VERSION=1.0.0
-```
-
-Then run:
+Récupérez la dernière image :
 
 ```bash
-docker compose pull
-docker compose up -d
+docker pull odi2050/stackbridge:latest
 ```
 
-## 📂 Importing folders
+Exportez-la :
 
-StackBridge does not use the browser's native folder picker. To preserve a complete directory tree without repeated browser confirmation, compress the directory into a ZIP file and select the archive.
+```bash
+docker save -o stackbridge-latest.tar odi2050/stackbridge:latest
+```
 
-The internal ZIP paths are used to create the corresponding **BookStack chapter structure**.
+Récupérez également les fichiers de déploiement :
 
-## 🔄 Docker update
+```bash
+git clone https://github.com/odi2050/stackbridge.git
+```
 
-To update a deployment using the Docker Hub image:
+Transférez sur le réseau isolé :
+
+- `stackbridge-latest.tar` ;
+- le dossier `stackbridge/` contenant notamment `docker-compose.yml` et les scripts.
+
+### 2. Sur le serveur hors ligne
+
+Chargez l'image :
+
+```bash
+docker load -i stackbridge-latest.tar
+```
+
+Vérifiez :
+
+```bash
+docker image ls odi2050/stackbridge
+```
+
+Placez-vous dans le dossier StackBridge puis générez `.env` **sans accès Internet** grâce au script déjà présent dans l'image :
+
+```bash
+docker run --rm -it -v "$PWD:/config" odi2050/stackbridge:latest \
+  python /app/scripts/setup_env.py --output /config/.env
+```
+
+Démarrez ensuite sans demander de téléchargement :
+
+```bash
+docker compose up -d --pull never
+docker compose ps
+```
+
+`--pull never` est recommandé en air gap afin que Docker utilise explicitement l'image locale.
+
+### Mise à jour d'un environnement hors ligne
+
+Sur le poste connecté :
+
+```bash
+docker pull odi2050/stackbridge:latest
+docker save -o stackbridge-latest.tar odi2050/stackbridge:latest
+```
+
+Transférez le nouveau TAR et, si nécessaire, les nouveaux fichiers du dépôt. Sur le serveur isolé :
+
+```bash
+docker compose down
+docker load -i stackbridge-latest.tar
+docker compose up -d --pull never
+```
+
+Ne supprimez pas `.env`, `data/` ou la clé de chiffrement pendant une mise à jour.
+
+## Mise à jour Docker connectée
+
+Puisque `latest` est le comportement par défaut :
 
 ```bash
 git pull
@@ -128,79 +169,130 @@ docker compose pull
 docker compose up -d
 ```
 
-If `APP_VERSION` is not defined, Compose pulls `odi2050/stackbridge:latest`. If `APP_VERSION` is defined, it pulls the corresponding version tag.
-
-Before a major update, back up `.env`, `data/` and `logs/`. Never delete `data/.settings.key` if `SETTINGS_ENCRYPTION_KEY` is not defined in `.env`.
-
-### Stop and restart
+Pour vérifier l'image utilisée :
 
 ```bash
-docker compose stop
-docker compose start
-docker compose restart
+docker compose images
 ```
 
-Remove only the container while keeping persistent data:
+### Figer volontairement une version
 
-```bash
-docker compose down
+Modifiez `.env`, par exemple :
+
+```env
+APP_VERSION=1.0.0
 ```
 
-Recreate it later with:
+Puis :
 
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-## 🏷️ Versioning and Docker releases
+Pour revenir au fonctionnement recommandé :
 
-StackBridge follows [Semantic Versioning](https://semver.org/) using `MAJOR.MINOR.PATCH`.
+```env
+APP_VERSION=latest
+```
 
-- `MAJOR`: incompatible configuration, API or data change;
-- `MINOR`: backward-compatible feature;
-- `PATCH`: backward-compatible fix.
+## Configuration BookStack
 
-The `VERSION` file is the repository source of truth for development releases. Published Docker images should use matching version tags such as:
+Dans **Administration > Connexion BookStack**, renseignez l'URL de BookStack, le Token ID et le Token Secret du compte de service utilisé par défaut.
+
+Les utilisateurs qui ne demandent rien de particulier utilisent cette configuration administrateur.
+
+### Token personnel et traçabilité
+
+Un utilisateur peut activer **Utiliser mon token API BookStack personnel** dans l'importateur. Les requêtes sont alors effectuées avec les permissions du compte BookStack ayant créé ce token, ce qui permet d'attribuer les créations au bon utilisateur côté BookStack.
+
+Dans BookStack :
+
+1. ouvrir **Mon compte / My Account** ;
+2. ouvrir **Accès et sécurité / Access & Security** ;
+3. créer un token dans **API Tokens**, par exemple `StackBridge` ;
+4. copier immédiatement le Token ID et le Token Secret ;
+5. les saisir dans StackBridge puis cliquer sur **Charger les livres**.
+
+Le secret n'est affiché qu'une fois par BookStack. Si API Tokens n'est pas disponible, le rôle doit disposer de la permission **Access System API**.
+
+## OIDC / Keycloak
+
+OIDC est entièrement facultatif et se configure dans **Administration > Authentification OIDC / Keycloak**.
+
+Renseignez :
+
+- Issuer URL ;
+- Client ID ;
+- Client Secret si nécessaire ;
+- scopes, généralement `openid profile email` ;
+- nom d'affichage du SSO ;
+- activation ou non du fallback local.
+
+Utilisez **Tester la configuration OIDC** avant l'activation. StackBridge interroge :
 
 ```text
-odi2050/stackbridge:1.0.0
-odi2050/stackbridge:latest
+<issuer>/.well-known/openid-configuration
 ```
 
-Never reuse the same version tag for different releases. For intermediate testing, use SemVer prereleases such as `1.1.0-rc.1`.
+Le client Keycloak doit autoriser la Redirect URI :
 
-### Build the image locally (developers)
-
-A local build remains possible for development or testing:
-
-```bash
-git clone https://github.com/odi2050/stackbridge.git
-cd stackbridge
-docker build --build-arg APP_VERSION=1.0.0 -t stackbridge:1.0.0 .
+```text
+https://VOTRE_STACKBRIDGE/auth/oidc/callback
 ```
 
-The Dockerfile embeds `APP_VERSION` as `STACKBRIDGE_VERSION`, adds OCI image metadata, exposes port `5050` and includes the application healthcheck.
+StackBridge utilise Authorization Code + PKCE S256. Les claims `sub`, nom/username et email servent à identifier l'utilisateur et à enrichir la journalisation des imports.
 
-## 🐍 Installation without Docker
+**Important :** le jeton OIDC Keycloak ne remplace pas le Token ID/Token Secret de l'API BookStack. Pour la traçabilité BookStack des créations, utilisez le token API personnel.
 
-### Requirements
+### Fallback local
 
-- Python 3.12 or compatible;
-- Git;
-- Tesseract OCR, optional but required for scanned PDFs;
-- network access to BookStack and, if enabled, the AI API.
+Le fallback est prévu pour éviter un verrouillage lorsque Keycloak est indisponible. Lorsqu'il est autorisé, la page de connexion propose **Continuer en mode local** et l'utilisation de ce mode est journalisée.
 
-Debian / Ubuntu:
+Il est conseillé de le laisser activé pendant la mise en service OIDC. Il peut ensuite être désactivé si la politique de sécurité impose exclusivement l'authentification centralisée.
 
-```bash
-sudo apt update
-sudo apt install tesseract-ocr tesseract-ocr-fra tesseract-ocr-eng
+## Documents, PDF et OCR
+
+StackBridge accepte DOCX, PDF, Markdown, HTML, TXT et ZIP. Les fichiers peuvent être sélectionnés ou glissés-déposés. Une confirmation visuelle affiche le nombre de documents réellement chargés.
+
+Pour une arborescence de dossiers, utilisez un ZIP. Les chemins internes peuvent devenir des chapitres BookStack.
+
+Le moteur PDF V2 décide page par page entre extraction native et OCR. Une page scannée reste représentée par son rendu original même lorsque Tesseract ne produit pas de texte exploitable.
+
+## Amélioration IA
+
+L'IA est optionnelle. Configurez le service dans Administration puis activez-la dans l'importateur.
+
+Les gros documents sont découpés en blocs en préservant autant que possible titres, tableaux, listes et code. **Améliorer tous les fichiers** traite les documents séquentiellement pour limiter la charge. La version originale reste disponible.
+
+Les images Base64 sont masquées par défaut avant l'appel au modèle puis restaurées. Cela réduit fortement la consommation du contexte. `AI_MAX_INPUT_TOKENS` vaut `6000` par défaut.
+
+## Sécurité et données persistantes
+
+Les secrets administrateur sont chiffrés avec Fernet dans `data/settings.json`, notamment les identifiants BookStack, la clé IA et le Client Secret OIDC.
+
+Sauvegardez :
+
+```text
+.env
+data/settings.json
+data/admin_auth.json
+data/.settings.key
 ```
 
-On Windows, install Tesseract and add its directory to `PATH`.
+Si `SETTINGS_ENCRYPTION_KEY` est défini dans `.env`, sauvegardez également cette valeur de manière sécurisée.
 
-### Linux / macOS
+Avec un reverse proxy HTTPS :
+
+```env
+SESSION_COOKIE_SECURE=true
+```
+
+Les logs sont conservés dans `logs/app.log`. Le panneau Administration permet d'activer la journalisation détaillée et de consulter/télécharger les dernières lignes.
+
+## Installation Python sans Docker
+
+Python 3.12 est recommandé. Tesseract est requis pour les PDF scannés. Pandoc/LibreOffice peuvent également être nécessaires selon les conversions.
 
 ```bash
 git clone https://github.com/odi2050/stackbridge.git
@@ -213,129 +305,34 @@ python scripts/setup_env.py
 python app.py
 ```
 
-### Windows PowerShell
+Sous Windows, activez le venv avec :
 
 ```powershell
-git clone https://github.com/odi2050/stackbridge.git
-Set-Location stackbridge
-py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python scripts\setup_env.py
-python app.py
 ```
 
-StackBridge listens on `0.0.0.0:5050` with Waitress. `.env` is loaded automatically at startup.
+## Construction locale de l'image
 
-### Direct installation update
+Pour le développement :
 
 ```bash
-git pull
-python -m pip install -r requirements.txt
-python scripts/check_release.py
+git clone https://github.com/odi2050/stackbridge.git
+cd stackbridge
+docker build --build-arg APP_VERSION=dev -t stackbridge:dev .
 ```
 
-Restart the StackBridge process or its system service afterwards.
+L'installation utilisateur normale doit privilégier `odi2050/stackbridge:latest`.
 
-## ⚙️ Administration
+## Documentation
 
-Open `/admin` to configure BookStack, AI, TLS certificate verification and detailed logging. Model discovery queries the OpenAI-compatible `/v1/models` endpoint.
+- Guide détaillé StackBridge : [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
+- Documentation BookStack OIDC : https://www.bookstackapp.com/docs/admin/oidc-auth/
+- Documentation BookStack : https://www.bookstackapp.com/docs/
 
-- `Vérifier les certificats SSL/TLS` applies to BookStack and AI calls.
-- `http://` URLs are supported but should only be used on trusted networks.
-- Global detailed logging traces routes, conversion, OCR, HTTP calls, AI and imports.
-- Rotating logs are written to `logs/app.log`.
+## Licence
 
-Before an AI call, Base64 images are replaced with small markers and restored after the response. This prevents image data from consuming large amounts of the model context. `AI_MAX_INPUT_TOKENS` sets the preventive input text limit (6000 by default).
-
-The administration option `Envoyer les images à l’IA` can disable this masking. It is disabled by default because Base64 image payloads can rapidly exceed provider token limits.
-
-### Custom AI API
-
-Custom mode allows configuration of the POST endpoint, JSON request body and response text path. Available variables are `{{model}}`, `{{system_prompt}}`, `{{prompt}}`, `{{html}}` and `{{level}}`.
-
-Response paths use dot notation, for example `message.content` or `choices.0.message.content`. An Ollama preset is included.
-
-Tokens and API keys are never displayed in the user interface. They are stored encrypted in `data/settings.json`, excluded from Git.
-
-Sensitive `settings.json` fields (`token_id`, `token_secret`, `ai_api_key`) are encrypted with Fernet. A local key is created in `data/.settings.key`; for production, prefer `SETTINGS_ENCRYPTION_KEY` supplied through a Docker secret or environment variable.
-
-## 🔐 Security
-
-### Secret protection
-
-- BookStack Token ID, Token Secret and AI API key are encrypted at rest with Fernet.
-- Legacy plaintext values are automatically migrated when loaded.
-- The local key is stored in `data/.settings.key` with restrictive permissions where supported.
-- In production, `SETTINGS_ENCRYPTION_KEY` should come from a secret manager, Docker secret or secured environment variable.
-- Secrets are never returned by the public API or displayed in the UI.
-- `.env`, `data/settings.json`, `data/admin_auth.json`, `data/.settings.key` and logs are excluded from Git or the Docker build context.
-
-### Administrator authentication
-
-- Administrator password can be changed from `/admin`.
-- New passwords must contain at least 12 characters.
-- Only a salted scrypt hash is stored in `data/admin_auth.json`.
-- Current password is required before modification.
-- Existing administrator sessions are invalidated after a password change.
-- After five failed logins from one address, new attempts are blocked for 15 minutes.
-- Production Docker deployments should define `ADMIN_PASSWORD_HASH` and `SECRET_KEY` in `.env`.
-
-### Sessions and administrative requests
-
-- Administrative data-changing requests are protected with a random session-bound CSRF token.
-- Login and logout are also protected against cross-site requests.
-- Session cookies use `HttpOnly` and `SameSite=Strict`.
-- With HTTPS, set `SESSION_COOKIE_SECURE=true`.
-
-### Imported content and preview
-
-- HTML from documents and AI responses is sanitized before preview and BookStack import.
-- Dangerous active tags including `script`, `iframe`, `object`, `embed` and forms are removed.
-- Event attributes such as `onclick` and `onerror`, plus `javascript:` and `vbscript:` URLs, are removed.
-- ZIP archives are read without direct filesystem extraction, reducing path traversal risk.
-- Encrypted or unreadable ZIPs, archives containing more than 2,000 documents, or archives exceeding the decompressed size limit are rejected.
-
-### HTTP and network security
-
-- BookStack and AI calls are performed server-side through a centralized HTTP client; tokens do not transit through the browser.
-- TLS verification is global and enabled by default.
-- HTTP URLs are accepted but send data without encryption; HTTPS is recommended outside trusted networks.
-- Responses include security headers such as `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` and CSP.
-- HSTS is automatically sent when the application itself is served through HTTPS.
-- Waitress replaces Flask's development server for production execution.
-
-### Logging
-
-- Detailed logs do not record tokens, API keys or authorization headers.
-- Log files rotate, are size-limited and excluded from Git and the Docker image.
-- Detailed mode can contain filenames, models, endpoints and technical information; restrict access to `logs/`.
-
-### Deployment recommendations
-
-1. Use an HTTPS reverse proxy in front of Waitress.
-2. Define unique strong values for `SECRET_KEY`, `ADMIN_PASSWORD_HASH` and `SETTINGS_ENCRYPTION_KEY`.
-3. Enable `SESSION_COOKIE_SECURE=true` when HTTPS is operational.
-4. Back up `data/settings.json`, `data/admin_auth.json` and the encryption key separately.
-5. Restrict `data/` and `logs/` permissions to the application account.
-6. Keep TLS verification enabled and rotate BookStack tokens and AI keys regularly.
-7. Never publish `.env`, `data/` or `logs/`.
-
-## 🔍 Search keywords
-
-StackBridge may also be useful if you are searching for:
-
-`BookStack importer` · `BookStack document importer` · `BookStack DOCX import` · `Word to BookStack` · `DOCX to BookStack` · `PDF to BookStack` · `BookStack PDF importer` · `BookStack OCR` · `BookStack migration tool` · `self-hosted document importer` · `Docker BookStack importer`
-
-## 🤝 Contributing
-
-Issues, bug reports, documentation improvements and contributions are welcome. If you find StackBridge useful, starring the repository helps other BookStack users discover the project.
-
-## 📜 License
-
-StackBridge is released under the **MIT License**. See `LICENSE` for details.
+StackBridge est publié sous licence MIT. Voir `LICENSE`.
 
 ## Notes
 
-The preview cache is stored in memory and disappears after restart. PDF vector drawings are detected but are not separately rasterized, avoiding conversion of borders and tables into images.
+Le cache de prévisualisation est conservé en mémoire et disparaît lors du redémarrage de StackBridge.
