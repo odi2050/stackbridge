@@ -72,4 +72,10 @@ def public():
  return {"bookstack_url":data["bookstack_url"],"token_id":data["token_id"],"has_token_secret":bool(data["token_secret"]),"ai_url":data["ai_url"],"ai_model":data["ai_model"],"has_ai_api_key":bool(data["ai_api_key"]),"ai_custom_enabled":bool(data["ai_custom_enabled"]),"ai_endpoint":data["ai_endpoint"],"ai_request_json":data["ai_request_json"],"ai_response_path":data["ai_response_path"],"verify_tls":bool(data["verify_tls"]),"debug_logs":bool(data["debug_logs"]),"send_images_to_ai":bool(data["send_images_to_ai"])}
 
 def resolve(data):
- saved=load();out=dict(data or {});out["url"]=out.get("url") or saved["bookstack_url"];out["token_id"]=out.get("token_id") or saved["token_id"];out["token_secret"]=out.get("token_secret") or saved["token_secret"];return out
+ saved=load();out=dict(data or {});personal=out.get("use_personal_token") is True or str(out.get("use_personal_token","")).lower()=="true";out["url"]=saved["bookstack_url"]
+ if personal:
+  out["token_id"]=str(out.get("token_id") or "").strip();out["token_secret"]=str(out.get("token_secret") or "").strip()
+  if not out["token_id"] or not out["token_secret"]:raise ValueError("Token ID et Token Secret personnels requis")
+ else:
+  out["token_id"]=saved["token_id"];out["token_secret"]=saved["token_secret"]
+ return out
