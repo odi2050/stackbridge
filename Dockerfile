@@ -4,6 +4,7 @@ LABEL org.opencontainers.image.title="StackBridge" \
       org.opencontainers.image.description="Document Import Studio for BookStack" \
       org.opencontainers.image.version="${APP_VERSION}"
 ENV STACKBRIDGE_VERSION="${APP_VERSION}" \
+    AI_MAX_INPUT_TOKENS=3000 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-fra tesseract-ocr-eng pandoc libreoffice-writer && rm -rf /var/lib/apt/lists/*
