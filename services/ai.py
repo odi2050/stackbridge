@@ -1,12 +1,16 @@
 import os
 import re
 import json
+import time
 from bs4 import BeautifulSoup,NavigableString,Tag
 from .runtime import request,detail
 
 SYSTEM_PROMPT="""Améliore cette fiche BookStack sans inventer. Conserve exactement commandes, IP, VLAN, noms, nombres et faits. Ne supprime, ne renomme et ne déplace aucun marqueur IMAGE_BOOKSTACK. Retourne uniquement du HTML."""
-MAX_INPUT_TOKENS=int(os.getenv("AI_MAX_INPUT_TOKENS","6000"))
+MAX_INPUT_TOKENS=int(os.getenv("AI_MAX_INPUT_TOKENS","3000"))
 AI_REQUEST_TIMEOUT=int(os.getenv("AI_REQUEST_TIMEOUT","300"))
+AI_MAX_RETRIES=max(0,int(os.getenv("AI_MAX_RETRIES","2")))
+AI_RETRY_BACKOFF=max(0,float(os.getenv("AI_RETRY_BACKOFF","3")))
+AI_RETRYABLE_STATUS={502,503,504}
 IMAGE_RE=re.compile(r"<img\b[^>]*>",re.IGNORECASE|re.DOTALL)
 HEADING_TAGS={"h1","h2","h3","h4","h5","h6"}
 ATOMIC_TAGS={"table","pre","ul","ol"}
@@ -76,7 +80,6 @@ def _tag_attrs(tag):
  return " ".join(f'{key}="{str(value).replace(chr(34),"&quot;")}"' for key,value in tag.attrs.items() if not isinstance(value,list))
 
 def _split_text_element(tag,max_chars):
- """Split a huge text element at line/sentence boundaries while keeping valid HTML."""
  text=tag.get_text("",strip=False);name=tag.name or "p";attrs=_tag_attrs(tag)
  overhead=len(_wrap(name,"",attrs))+64;budget=max(256,max_chars-overhead)
  if name=="pre":units=text.splitlines(keepends=True)
@@ -96,7 +99,6 @@ def _split_text_element(tag,max_chars):
  return [_wrap(name,BeautifulSoup("", "html.parser").new_string(piece).output_ready(),attrs) for piece in pieces]
 
 def _split_table(tag,max_chars):
- """Split an oversized table only between rows and repeat its header in every part."""
  rows=tag.find_all("tr")
  if not rows:return _split_text_element(tag,max_chars)
  header=[]
@@ -119,7 +121,6 @@ def _split_table(tag,max_chars):
  return [_wrap("table",head+"".join(part),attrs) for part in parts]
 
 def _split_list(tag,max_chars):
- """Split oversized lists only between list items."""
  items=tag.find_all("li",recursive=False)
  if not items:return _split_text_element(tag,max_chars)
  attrs=_tag_attrs(tag);overhead=len(_wrap(tag.name,"",attrs))+64;budget=max(512,max_chars-overhead)
@@ -138,7 +139,6 @@ def _split_atomic(tag,max_chars):
  return _split_text_element(tag,max_chars)
 
 def _split_html(html,max_chars):
- """Structure-aware HTML chunking. Never slices raw HTML in the middle of a tag."""
  soup=BeautifulSoup(html,"html.parser")
  nodes=list(soup.body.contents) if soup.body else list(soup.contents)
  chunks=[];current="";section_heading=""
@@ -153,7 +153,6 @@ def _split_html(html,max_chars):
   if current and len(current)+len(piece)>max_chars:flush();prefix=context
   if len(piece)<=max_chars:current+=prefix+piece;return
   flush()
-  # This path should only be reached for an unusual non-atomic giant node.
   parsed=BeautifulSoup(piece,"html.parser");root=next((x for x in parsed.contents if isinstance(x,Tag)),None)
   if root:
    for part in _split_text_element(root,max_chars):
@@ -177,7 +176,6 @@ def _split_html(html,max_chars):
  return chunks or [html]
 
 def _validate_chunk_result(content):
- """Normalize each AI result through the HTML parser before final assembly."""
  soup=BeautifulSoup(content,"html.parser")
  if soup.body:return "".join(str(x) for x in soup.body.contents)
  return "".join(str(x) for x in soup.contents)
@@ -195,7 +193,15 @@ def _request_improvement(masked_html,url,model,key,level,custom_enabled,endpoint
  else:
   payload={"model":model,"temperature":0.1,"messages":[{"role":"system","content":SYSTEM_PROMPT},{"role":"user","content":user_content}]};target=url.rstrip("/")+"/chat/completions"
  detail("AI request mode=%s endpoint=%s response_path=%s chunk=%s/%s",("custom" if custom_enabled else "openai"),target,response_path,chunk_index,chunk_total)
- response=request("POST",target,headers=headers,json=payload,timeout=AI_REQUEST_TIMEOUT);_raise_api_error(response)
+ response=None
+ for attempt in range(AI_MAX_RETRIES+1):
+  response=request("POST",target,headers=headers,json=payload,timeout=AI_REQUEST_TIMEOUT)
+  if response.ok:break
+  if response.status_code not in AI_RETRYABLE_STATUS or attempt>=AI_MAX_RETRIES:_raise_api_error(response)
+  delay=AI_RETRY_BACKOFF*(2**attempt)
+  detail("AI transient gateway error status=%s chunk=%s/%s attempt=%s/%s retry_in_seconds=%s",response.status_code,chunk_index,chunk_total,attempt+1,AI_MAX_RETRIES+1,delay)
+  if delay:time.sleep(delay)
+ _raise_api_error(response)
  try:return _response_value(response.json(),response_path)
  except ValueError as error:raise RuntimeError("Réponse IA invalide : le serveur n’a pas retourné de JSON") from error
 
