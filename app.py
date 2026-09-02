@@ -66,11 +66,11 @@ def user_login():
 def oidc_login():
  cfg=settings.load()
  if not cfg.get("oidc_enabled"):return redirect(url_for("home"))
+ if session.get("user") or session.get("local_fallback"):return redirect(url_for("home"))
  try:
   meta=oidc_discovery(cfg.get("oidc_issuer"));verifier=secrets.token_urlsafe(64);challenge=base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode();state=secrets.token_urlsafe(32);session["oidc_state"]=state;session["oidc_verifier"]=verifier
   client=OAuth2Session(cfg.get("oidc_client_id"),cfg.get("oidc_client_secret"),scope=cfg.get("oidc_scopes") or "openid profile email",redirect_uri=url_for("oidc_callback",_external=True),code_challenge_method="S256");uri,_=client.create_authorization_url(meta["authorization_endpoint"],state=state,code_challenge=challenge,code_challenge_method="S256",nonce=secrets.token_urlsafe(24));return redirect(uri)
- except Exception as e:
-  logger.exception("OIDC login initialization failed");return redirect(url_for("user_login",error="OIDC indisponible : "+str(e)))
+ except Exception as e:logger.exception("OIDC login initialization failed");return redirect(url_for("user_login",error="OIDC indisponible : "+str(e)))
 @app.get("/auth/oidc/callback")
 def oidc_callback():
  cfg=settings.load();expected=session.pop("oidc_state",None);verifier=session.pop("oidc_verifier",None)
@@ -82,8 +82,7 @@ def oidc_callback():
    userinfo=client.get(meta["userinfo_endpoint"],token=token,timeout=15);userinfo.raise_for_status();claims=userinfo.json()
   if not claims.get("sub"):raise ValueError("Le fournisseur OIDC n'a pas retourné de claim sub")
   session["user"]={"sub":str(claims.get("sub")),"name":str(claims.get("name") or claims.get("preferred_username") or claims.get("email") or claims.get("sub")),"email":str(claims.get("email") or "")};session.pop("local_fallback",None);target=safe_next(session.pop("login_next","/"));logger.info("OIDC user authenticated sub=%s name=%s",session["user"]["sub"],session["user"]["name"]);return redirect(target)
- except Exception as e:
-  logger.exception("OIDC callback failed");return redirect(url_for("user_login",error="Connexion OIDC impossible : "+str(e)))
+ except Exception as e:logger.exception("OIDC callback failed");return redirect(url_for("user_login",error="Connexion OIDC impossible : "+str(e)))
 @app.get("/auth/local")
 def local_access():
  cfg=settings.load()
@@ -186,7 +185,7 @@ def ai(k):
  x=CACHE.get(k)
  if not x:return jsonify(message="Prévisualisation expirée"),404
  d=request.json or {};saved=settings.load()
- try:x["ai"]=clean_html(improve(x["html"],d.get("url") or saved["ai_url"],d.get("model") or saved["ai_model"],d.get("api_key") or saved["ai_api_key"],d.get("level","structure"),bool(saved.get("send_images_to_ai",False)),bool(saved.get("ai_custom_enabled",False)),saved.get("ai_endpoint","/chat/completions"),saved.get("ai_request_json",""),saved.get("ai_response_path","choices.0.message.content")));return jsonify(success=True)
+ try:x["ai"]=clean_html(improve(x["html"],d.get("url") or saved["ai_url"],d.get("model") or saved["ai_model"],d.get("api_key") or saved["ai_api_key"],d.get("level","structure"),bool(saved.get("send_images_to_ai",False)),bool(saved.get("ai_custom_enabled",False)),saved.get("ai_endpoint","/chat/completions"),saved.get("ai_request_json",""),saved.get("ai_response_path","choices.0.message.content"),saved.get("ai_chunk_tokens","2000")));return jsonify(success=True)
  except Exception as e:logger.exception("AI improvement failed cache_id=%s",k);return jsonify(success=False,message=str(e)),400
 @app.post("/api/import")
 def imp():
@@ -198,12 +197,8 @@ def imp():
    cid=None
    if x["chapter"]:
     key=x["chapter"].lower();cid=cc.get(key)
-    if not cid:c=bookstack.new_chapter(d["url"],d["token_id"],d["token_secret"],d["book_id"],x["chapter"]);cid=c["id"];cc[key]=cid
-   body=x["ai"] if q.get("version")=="ai" and x["ai"] else x["html"];p=bookstack.new_page(d["url"],d["token_id"],d["token_secret"],d["book_id"],cid,x["title"],body);res.append({"file":x["file"],"page_id":p.get("id")})
-  logger.info("BookStack import complete actor=%s pages=%s",identity.get("name"),len(res));return jsonify(success=True,results=res)
+    if not cid:cid=bookstack.create_chapter(d["url"],d["token_id"],d["token_secret"],d["book_id"],x["chapter"]);cc[key]=cid
+   html=x["ai"] if q.get("use_ai") and x["ai"] else x["html"];page=bookstack.create_page(d["url"],d["token_id"],d["token_secret"],x["title"],html,book_id=d["book_id"] if not cid else None,chapter_id=cid);res.append({"file":x["file"],"page":page})
+  return jsonify(success=True,results=res)
  except Exception as e:logger.exception("BookStack import failed");return jsonify(success=False,message=str(e)),400
-if __name__=="__main__":
- from waitress import serve
- if ADMIN_PASSWORD=="admin" and not ADMIN_PASSWORD_HASH:logger.warning("ADMIN_PASSWORD is still the insecure default; configure ADMIN_PASSWORD_HASH for production")
- if SECRET_KEY=="stackbridge-change-me":logger.warning("SECRET_KEY is still the insecure default; configure a random production value")
- logger.info("Starting %s %s production WSGI server on 0.0.0.0:5050",APP_NAME,APP_VERSION);serve(app,host="0.0.0.0",port=5050,threads=8)
+if __name__=="__main__":app.run(host="0.0.0.0",port=5050,debug=False)
