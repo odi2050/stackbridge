@@ -16,3 +16,11 @@ def new_chapter(url,token_id,token_secret,book_id,name,verify=None):
 def new_page(url,token_id,token_secret,book_id,chapter_id,name,html,verify=None):
  payload={"name":name,"html":html};payload["chapter_id" if chapter_id else "book_id"]=int(chapter_id or book_id);detail("BookStack create page target=%s name=%s html_chars=%s",chapter_id or book_id,name,len(html))
  response=request("POST",url.rstrip("/")+"/api/pages",headers={**headers(token_id,token_secret),"Content-Type":"application/json"},json=payload,timeout=180);response.raise_for_status();return response.json()
+
+# Stable public helpers used by app.py. Keep the legacy new_* functions above for compatibility.
+def create_chapter(url,token_id,token_secret,book_id,name,verify=None):
+ return new_chapter(url,token_id,token_secret,book_id,name,verify)
+
+def create_page(url,token_id,token_secret,name,html,book_id=None,chapter_id=None,verify=None):
+ if not book_id and not chapter_id:raise ValueError("book_id ou chapter_id requis pour créer une page BookStack")
+ return new_page(url,token_id,token_secret,book_id,chapter_id,name,html,verify)
