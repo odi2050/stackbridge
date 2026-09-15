@@ -3,6 +3,7 @@
 .git
 data
 logs
+certs
 __pycache__
 *.pyc
 *.log
