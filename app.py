@@ -113,7 +113,7 @@ def oidc_callback():
  cfg=settings.load();expected=session.pop("oidc_state",None);verifier=session.pop("oidc_verifier",None)
  if not expected or not hmac.compare_digest(request.args.get("state","") ,expected):return redirect(url_for("user_login",error="État OIDC invalide ou expiré"))
  try:
-  verify=tls_verify_value(cfg.get("verify_tls",True));meta=oidc_discovery(cfg.get("oidc_issuer"),verify);client=OAuth2Session(cfg.get("oidc_client_id"),cfg.get("oidc_client_secret"),redirect_uri=url_for("oidc_callback",_external=True),code_challenge_method="S256");client.verify=verify;token=client.fetch_token(meta["token_endpoint"],authorization_response=request.url,code_verifier=verifier,verify=verify)
+  verify=tls_verify_value(cfg.get("verify_tls",True));meta=oidc_discovery(cfg.get("oidc_issuer"),verify);client=OAuth2Session(cfg.get("oidc_client_id"),cfg.get("oidc_client_secret"),redirect_uri=url_for("oidc_callback",_external=True),code_challenge_method="S256");client.verify=verify;token=client.fetch_token(meta["token_endpoint"],authorization_response=request.url,code_verifier=verifier)
   claims={}
   if meta.get("userinfo_endpoint"):
    userinfo=client.get(meta["userinfo_endpoint"],token=token,timeout=15,verify=verify);userinfo.raise_for_status();claims=userinfo.json()
