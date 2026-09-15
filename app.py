@@ -105,7 +105,7 @@ def oidc_login():
  if session.get("user") or session.get("local_fallback"):return redirect(url_for("home"))
  try:
   verify=tls_verify_value(cfg.get("verify_tls",True));meta=oidc_discovery(cfg.get("oidc_issuer"),verify);verifier=secrets.token_urlsafe(64);challenge=base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode();state=secrets.token_urlsafe(32);session["oidc_state"]=state;session["oidc_verifier"]=verifier
-  client=OAuth2Session(cfg.get("oidc_client_id"),cfg.get("oidc_client_secret"),scope=cfg.get("oidc_scopes") or "openid profile email",redirect_uri=url_for("oidc_callback",_external=True),code_challenge_method="S256");client.verify=verify;uri,_=client.create_authorization_url(meta["authorization_endpoint"],state=state,code_challenge=challenge,code_challenge_method="S256",nonce=secrets.token_urlsafe(24));return redirect(uri)
+  client=OAuth2Session(cfg.get("oidc_client_id"),cfg.get("oidc_client_secret"),scope=cfg.get("oidc_scopes") or "openid profile email",redirect_uri=url_for("oidc_callback",_external=True),code_challenge_method="S256");uri,_=client.create_authorization_url(meta["authorization_endpoint"],state=state,code_challenge=challenge,code_challenge_method="S256",nonce=secrets.token_urlsafe(24));return redirect(uri)
  except Exception as e:logger.exception("OIDC login initialization failed");return redirect(url_for("user_login",error="OIDC indisponible : "+str(e)))
 
 @app.get("/auth/oidc/callback")
@@ -113,7 +113,7 @@ def oidc_callback():
  cfg=settings.load();expected=session.pop("oidc_state",None);verifier=session.pop("oidc_verifier",None)
  if not expected or not hmac.compare_digest(request.args.get("state","") ,expected):return redirect(url_for("user_login",error="État OIDC invalide ou expiré"))
  try:
-  verify=tls_verify_value(cfg.get("verify_tls",True));meta=oidc_discovery(cfg.get("oidc_issuer"),verify);client=OAuth2Session(cfg.get("oidc_client_id"),cfg.get("oidc_client_secret"),redirect_uri=url_for("oidc_callback",_external=True),code_challenge_method="S256");client.verify=verify;token=client.fetch_token(meta["token_endpoint"],authorization_response=request.url,code_verifier=verifier)
+  verify=tls_verify_value(cfg.get("verify_tls",True));meta=oidc_discovery(cfg.get("oidc_issuer"),verify);client=OAuth2Session(cfg.get("oidc_client_id"),cfg.get("oidc_client_secret"),redirect_uri=url_for("oidc_callback",_external=True),code_challenge_method="S256");token=client.fetch_token(meta["token_endpoint"],authorization_response=request.url,code_verifier=verifier,timeout=15,verify=verify)
   claims={}
   if meta.get("userinfo_endpoint"):
    userinfo=client.get(meta["userinfo_endpoint"],token=token,timeout=15,verify=verify);userinfo.raise_for_status();claims=userinfo.json()
@@ -225,7 +225,7 @@ def analyze():
       if ".." in Path(name).parts or member.flag_bits&1:return jsonify(success=False,message="Archive ZIP invalide ou chiffrée"),400
       with archive.open(member) as source:convert_stream(name,source)
    except zipfile.BadZipFile:return jsonify(success=False,message=f"Archive ZIP illisible : {f.filename}"),400
-  else:f.stream.seek(0);convert_stream(f.filename,f.stream)
+  else:f.stream.seek(0);convert_stream(f.filename, f.stream)
  return jsonify(success=True,items=out)
 
 @app.get("/api/preview/<k>")
