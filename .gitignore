@@ -7,3 +7,4 @@ data/admin_auth.json
 data/.settings.key
 *.log
 logs/
+certs/

@@ -11,33 +11,31 @@
 - import multiple et glisser-déposer avec confirmation visuelle des fichiers chargés ;
 - ZIP avec conversion de l'arborescence en chapitres BookStack ;
 - prévisualisation avant publication ;
-- amélioration IA facultative, individuelle ou séquentielle pour tous les documents ;
+- amélioration IA facultative, individuelle ou pour tous les documents ;
 - découpage IA tenant compte des titres, listes, tableaux et blocs de code ;
-- choix global entre version originale et version IA ;
 - API OpenAI-compatible, configuration personnalisée et preset Ollama ;
 - token BookStack administrateur par défaut ;
 - token API BookStack personnel facultatif pour la traçabilité des imports ;
 - authentification OIDC/Keycloak facultative avec Authorization Code + PKCE S256 ;
-- configuration OIDC directement dans le panneau Administration ;
 - fallback local facultatif si le fournisseur OIDC est indisponible ;
+- support d'un reverse proxy avec sous-chemin, par exemple `/import-document` ;
+- support des certificats signés par une PKI interne via le trust store du conteneur ;
 - chiffrement Fernet des secrets administrateur ;
 - Docker/Compose et fonctionnement adapté aux réseaux isolés.
 
-Le guide détaillé des fonctions et de leur configuration se trouve dans [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
+Le guide détaillé se trouve dans [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
 
 ## Installation Docker — recommandée
 
 ### Image par défaut : `latest`
 
-L'installation standard utilise toujours :
+L'installation standard utilise :
 
 ```text
 odi2050/stackbridge:latest
 ```
 
-Le `docker-compose.yml` utilise `${APP_VERSION:-latest}` et le générateur de `.env` écrit désormais `APP_VERSION=latest`. Ainsi, **`latest` reste le choix mis en avant et utilisé par défaut**.
-
-Une version précise ne doit être définie que si vous souhaitez volontairement figer le déploiement.
+Le `docker-compose.yml` utilise `${APP_VERSION:-latest}`. Une version précise ne doit être définie que si vous souhaitez volontairement figer le déploiement.
 
 ### Prérequis
 
@@ -83,85 +81,38 @@ Ouvrez ensuite `http://ADRESSE_DU_SERVEUR:5050`. Le panneau d'administration est
 
 ## Installation hors ligne / Air Gap
 
-L'installation Docker est la méthode la plus simple en environnement isolé : **toutes les dépendances Python, Tesseract, Pandoc et LibreOffice nécessaires au conteneur sont transportées dans l'image Docker**.
+L'installation Docker est la méthode la plus simple en environnement isolé : les dépendances Python, Tesseract, Pandoc, LibreOffice et le magasin CA nécessaire sont transportés dans l'image Docker.
 
 ### 1. Sur un PC connecté à Internet
 
-Récupérez la dernière image :
-
 ```bash
 docker pull odi2050/stackbridge:latest
-```
-
-Exportez-la :
-
-```bash
 docker save -o stackbridge-latest.tar odi2050/stackbridge:latest
-```
-
-Récupérez également les fichiers de déploiement :
-
-```bash
 git clone https://github.com/odi2050/stackbridge.git
 ```
 
 Transférez sur le réseau isolé :
 
 - `stackbridge-latest.tar` ;
-- le dossier `stackbridge/` contenant notamment `docker-compose.yml` et les scripts.
+- le dossier `stackbridge/` contenant notamment `docker-compose.yml` et les scripts ;
+- si nécessaire, les certificats publics de votre AC interne au format `.crt`.
 
 ### 2. Sur le serveur hors ligne
 
-Chargez l'image :
-
 ```bash
 docker load -i stackbridge-latest.tar
-```
-
-Vérifiez :
-
-```bash
-docker image ls odi2050/stackbridge
-```
-
-Placez-vous dans le dossier StackBridge puis générez `.env` **sans accès Internet** grâce au script déjà présent dans l'image :
-
-```bash
+cd stackbridge
 docker run --rm -it -v "$PWD:/config" odi2050/stackbridge:latest \
   python /app/scripts/setup_env.py --output /config/.env
-```
-
-Démarrez ensuite sans demander de téléchargement :
-
-```bash
 docker compose up -d --pull never
 docker compose ps
 ```
 
 `--pull never` est recommandé en air gap afin que Docker utilise explicitement l'image locale.
 
-### Mise à jour d'un environnement hors ligne
-
-Sur le poste connecté :
-
-```bash
-docker pull odi2050/stackbridge:latest
-docker save -o stackbridge-latest.tar odi2050/stackbridge:latest
-```
-
-Transférez le nouveau TAR et, si nécessaire, les nouveaux fichiers du dépôt. Sur le serveur isolé :
-
-```bash
-docker compose down
-docker load -i stackbridge-latest.tar
-docker compose up -d --pull never
-```
-
 Ne supprimez pas `.env`, `data/` ou la clé de chiffrement pendant une mise à jour.
 
 ## Mise à jour Docker connectée
-
-Puisque `latest` est le comportement par défaut :
 
 ```bash
 git pull
@@ -177,10 +128,8 @@ docker compose images
 
 ### Figer volontairement une version
 
-Modifiez `.env`, par exemple :
-
 ```env
-APP_VERSION=1.0.0
+APP_VERSION=1.1.0
 ```
 
 Puis :
@@ -190,7 +139,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Pour revenir au fonctionnement recommandé :
+Pour revenir au comportement recommandé :
 
 ```env
 APP_VERSION=latest
@@ -199,8 +148,6 @@ APP_VERSION=latest
 ## Configuration BookStack
 
 Dans **Administration > Connexion BookStack**, renseignez l'URL de BookStack, le Token ID et le Token Secret du compte de service utilisé par défaut.
-
-Les utilisateurs qui ne demandent rien de particulier utilisent cette configuration administrateur.
 
 ### Token personnel et traçabilité
 
@@ -235,11 +182,19 @@ Utilisez **Tester la configuration OIDC** avant l'activation. StackBridge interr
 <issuer>/.well-known/openid-configuration
 ```
 
-Le client Keycloak doit autoriser la Redirect URI :
+Pour une installation à la racine, le client Keycloak doit autoriser une Redirect URI de la forme :
 
 ```text
 https://VOTRE_STACKBRIDGE/auth/oidc/callback
 ```
+
+Pour un déploiement sous `/import-document` :
+
+```text
+https://bookstack.exemple.fr/import-document/auth/oidc/callback
+```
+
+L'URI réellement générée est affichée directement dans l'administration StackBridge.
 
 StackBridge utilise Authorization Code + PKCE S256. Les claims `sub`, nom/username et email servent à identifier l'utilisateur et à enrichir la journalisation des imports.
 
@@ -249,7 +204,71 @@ StackBridge utilise Authorization Code + PKCE S256. Les claims `sub`, nom/userna
 
 Le fallback est prévu pour éviter un verrouillage lorsque Keycloak est indisponible. Lorsqu'il est autorisé, la page de connexion propose **Continuer en mode local** et l'utilisation de ce mode est journalisée.
 
-Il est conseillé de le laisser activé pendant la mise en service OIDC. Il peut ensuite être désactivé si la politique de sécurité impose exclusivement l'authentification centralisée.
+## Reverse proxy avec `/import-document`
+
+StackBridge peut être publié derrière le même nom DNS que BookStack :
+
+```text
+https://bookstack.exemple.fr/                 -> BookStack
+https://bookstack.exemple.fr/import-document/ -> StackBridge
+```
+
+Dans `.env` :
+
+```env
+SESSION_COOKIE_SECURE=true
+TRUST_PROXY_HEADERS=true
+```
+
+Exemple Apache HTTP Server :
+
+```apache
+ProxyPreserveHost On
+
+ProxyPass        /import-document/ http://127.0.0.1:5050/
+ProxyPassReverse /import-document/ http://127.0.0.1:5050/
+
+<Location /import-document/>
+    RequestHeader set X-Forwarded-Proto "https"
+    RequestHeader set X-Forwarded-Prefix "/import-document"
+</Location>
+```
+
+La règle `/import-document/` doit précéder une éventuelle règle `ProxyPass / ...` plus générale.
+
+`TRUST_PROXY_HEADERS=true` doit seulement être activé derrière un proxy de confiance. Si le port `5050` est accessible directement depuis le réseau, filtrez cet accès avec un pare-feu ou limitez-le au reverse proxy.
+
+StackBridge utilise alors le préfixe transmis pour ses ressources statiques, ses appels API, l'administration, les redirections après connexion et le callback OIDC.
+
+## Certificats locaux / PKI interne
+
+Si Keycloak utilise un certificat signé par votre PKI interne, gardez **Vérifier les certificats SSL/TLS** activé.
+
+Placez uniquement les certificats publics de l'AC racine et des éventuelles AC intermédiaires dans :
+
+```text
+stackbridge/
+└── certs/
+    ├── root-ca.crt
+    └── intermediate-ca.crt
+```
+
+Les fichiers doivent être au format PEM avec l'extension `.crt`. Ne copiez jamais une clé privée dans ce dossier.
+
+Le `docker-compose.yml` monte automatiquement `./certs` dans le magasin CA local du conteneur. Au démarrage, StackBridge lance `update-ca-certificates` et utilise ensuite `/etc/ssl/certs/ca-certificates.crt` pour ses connexions HTTPS, notamment :
+
+- découverte OIDC ;
+- endpoint token ;
+- endpoint `userinfo` ;
+- autres appels Python `requests` qui utilisent le bundle système.
+
+Après ajout ou remplacement d'un certificat :
+
+```bash
+docker compose up -d --force-recreate
+```
+
+Le dossier `certs/` est exclu de Git et du contexte de build Docker afin d'éviter d'embarquer accidentellement des certificats internes dans le dépôt ou dans l'image publique.
 
 ## Documents, PDF et OCR
 
@@ -263,9 +282,9 @@ Le moteur PDF V2 décide page par page entre extraction native et OCR. Une page 
 
 L'IA est optionnelle. Configurez le service dans Administration puis activez-la dans l'importateur.
 
-Les gros documents sont découpés en blocs en préservant autant que possible titres, tableaux, listes et code. **Améliorer tous les fichiers** traite les documents séquentiellement pour limiter la charge. La version originale reste disponible.
+Les gros documents sont découpés en blocs en préservant autant que possible titres, tableaux, listes et code. La version originale reste disponible.
 
-Les images Base64 sont masquées par défaut avant l'appel au modèle puis restaurées. Cela réduit fortement la consommation du contexte. `AI_MAX_INPUT_TOKENS` vaut `6000` par défaut.
+Les images Base64 sont masquées par défaut avant l'appel au modèle puis restaurées. `AI_MAX_INPUT_TOKENS` vaut `3000` par défaut dans l'image Docker.
 
 ## Sécurité et données persistantes
 
@@ -305,21 +324,17 @@ python scripts/setup_env.py
 python app.py
 ```
 
-Sous Windows, activez le venv avec :
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
+Pour une PKI interne sans Docker, vous pouvez définir `REQUESTS_CA_BUNDLE` vers un bundle PEM de confiance avant de lancer StackBridge.
 
 ## Construction locale de l'image
-
-Pour le développement :
 
 ```bash
 git clone https://github.com/odi2050/stackbridge.git
 cd stackbridge
 docker build --build-arg APP_VERSION=dev -t stackbridge:dev .
 ```
+
+Le dossier local `certs/` est ignoré par le contexte Docker et n'est donc pas inclus dans l'image.
 
 L'installation utilisateur normale doit privilégier `odi2050/stackbridge:latest`.
 

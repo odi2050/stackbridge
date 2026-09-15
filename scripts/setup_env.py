@@ -21,6 +21,7 @@ ADMIN_PASSWORD_HASH='{generate_password_hash(password,method='scrypt')}'
 SECRET_KEY={secrets.token_hex(32)}
 SETTINGS_ENCRYPTION_KEY={Fernet.generate_key().decode()}
 SESSION_COOKIE_SECURE=false
+TRUST_PROXY_HEADERS=false
 """
 output.parent.mkdir(parents=True,exist_ok=True);output.write_text(content,encoding="utf-8")
 print(f"Configuration créée dans {output}. Protégez ce fichier et ne le publiez jamais.")
