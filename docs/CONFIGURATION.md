@@ -216,7 +216,7 @@ Pour les gros documents, StackBridge découpe le contenu en blocs en essayant de
 
 Le sélecteur **Version pour tous** permet ensuite de choisir Originale ou Version IA pour l'ensemble des documents lorsque toutes les versions IA sont disponibles.
 
-Par défaut, les images Base64 sont masquées avant l'appel IA puis restaurées après traitement afin d'éviter une consommation excessive du contexte. `AI_MAX_INPUT_TOKENS` vaut 6000 par défaut.
+Par défaut, les images Base64 sont masquées avant l'appel IA puis restaurées après traitement afin d'éviter une consommation excessive du contexte. `AI_MAX_INPUT_TOKENS` vaut 3000 par défaut dans l'image Docker.
 
 ## 11. Secrets et sécurité
 
