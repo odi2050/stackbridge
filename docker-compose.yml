@@ -16,7 +16,9 @@ services:
       SECRET_KEY: "${SECRET_KEY:?Définissez SECRET_KEY dans le fichier .env}"
       SETTINGS_ENCRYPTION_KEY: "${SETTINGS_ENCRYPTION_KEY:-}"
       SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"
+      TRUST_PROXY_HEADERS: "${TRUST_PROXY_HEADERS:-false}"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      - ./certs:/usr/local/share/ca-certificates/stackbridge:ro
     restart: unless-stopped
